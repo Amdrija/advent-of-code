@@ -61,3 +61,35 @@ fn main() {
     let similarity_score = part_two(&list1, &list2);
     println!("{similarity_score}");
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{parse, part_one, part_two};
+    const LIST1: [i64; 6] = [3, 4, 2, 1, 3, 3];
+    const LIST2: [i64; 6] = [4, 3, 5, 3, 9, 3];
+    #[test]
+    fn test_parse() {
+        let content = String::from(
+            r#"3   4
+4   3
+2   5
+1   3
+3   9
+3   3"#,
+        );
+        let (list1, list2) = parse(content);
+
+        assert_eq!(list1, LIST1.to_vec());
+        assert_eq!(list2, LIST2.to_vec());
+    }
+
+    #[test]
+    fn test_part_one() {
+        assert_eq!(part_one(&mut LIST1.to_vec(), &mut LIST2.to_vec()), 11);
+    }
+
+    #[test]
+    fn test_part_two() {
+        assert_eq!(part_two(&LIST1.to_vec(), &LIST2.to_vec()), 31);
+    }
+}
