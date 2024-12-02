@@ -1,0 +1,6 @@
+[package]
+name = "a2024-02-red-nosed-reports"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
