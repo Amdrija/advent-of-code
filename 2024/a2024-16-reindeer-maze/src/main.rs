@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::BinaryHeap;
+use std::collections::{BinaryHeap, HashSet};
 use std::fs::File;
 use std::io::Read;
 
@@ -38,7 +38,7 @@ fn parse(content: &str) -> (Vec<Vec<char>>, Coordinates, Coordinates) {
     (grid, start, end)
 }
 
-#[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Clone, Copy, Hash)]
 enum Direction {
     Up = 0,
     Right = 1,
@@ -87,6 +87,20 @@ impl Direction {
     }
 }
 
+impl TryFrom<usize> for Direction {
+    type Error = ();
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Direction::Up),
+            1 => Ok(Direction::Right),
+            2 => Ok(Direction::Down),
+            3 => Ok(Direction::Left),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 struct State {
     score: u64,
@@ -120,43 +134,103 @@ impl Ord for State {
     }
 }
 
-fn dijkstra(grid: &Vec<Vec<char>>, start: &Coordinates, end: &Coordinates) -> u64 {
-    let mut min_distance = vec![vec![vec![u64::MAX; 4]; grid[0].len()]; grid.len()];
+fn dijkstra(
+    grid: &Vec<Vec<char>>,
+    start: &Coordinates,
+) -> (
+    Vec<Vec<Vec<u64>>>,
+    Vec<Vec<Vec<HashSet<(Coordinates, usize)>>>>,
+) {
+    let mut min_distances = vec![vec![vec![u64::MAX; 4]; grid[0].len()]; grid.len()];
+    let mut paths = vec![vec![vec![HashSet::new(); 4]; grid[0].len()]; grid.len()];
     let mut pq = BinaryHeap::new();
-    min_distance[start.row][start.col][Direction::Right as usize] = 0;
+    min_distances[start.row][start.col][Direction::Right as usize] = 0;
     pq.push(State::new(0, start.clone(), Direction::Right));
 
     while let Some(state) = pq.pop() {
-        if state.score > min_distance[state.coords.row][state.coords.col][state.direction as usize]
-        {
-            continue;
-        }
-
         for next_direction in state.direction.next_directions() {
             let next_coords = next_direction.next_coord(&state.coords);
             let next_score = state.score + state.direction.rotation_score(&next_direction) + 1;
             if grid[next_coords.row][next_coords.col] == '.'
                 && next_score
-                    <= min_distance[next_coords.row][next_coords.col][next_direction as usize]
+                    <= min_distances[next_coords.row][next_coords.col][next_direction as usize]
             {
-                min_distance[next_coords.row][next_coords.col][next_direction as usize] =
+                if next_score
+                    < min_distances[next_coords.row][next_coords.col][next_direction as usize]
+                {
+                    paths[next_coords.row][next_coords.col][next_direction as usize].clear();
+                }
+                paths[next_coords.row][next_coords.col][next_direction as usize]
+                    .insert((state.coords.clone(), state.direction as usize));
+                min_distances[next_coords.row][next_coords.col][next_direction as usize] =
                     next_score;
                 pq.push(State::new(next_score, next_coords, next_direction));
             }
         }
     }
 
-    *min_distance[end.row][end.col].iter().min().unwrap()
+    (min_distances, paths)
+}
+
+fn mark_paths(
+    mut grid: &mut Vec<Vec<char>>,
+    paths: &Vec<Vec<Vec<HashSet<(Coordinates, usize)>>>>,
+    min_distances: &Vec<Vec<Vec<u64>>>,
+    coordinates: &Coordinates,
+    direction: usize,
+    start: &Coordinates,
+) {
+    grid[coordinates.row][coordinates.col] = 'O';
+    if coordinates == start {
+        return;
+    }
+
+    for (previous_coord, previous_direction) in &paths[coordinates.row][coordinates.col][direction]
+    {
+        mark_paths(
+            grid,
+            paths,
+            min_distances,
+            previous_coord,
+            *previous_direction,
+            start,
+        );
+    }
+}
+
+fn print_grid(grid: &Vec<Vec<char>>) {
+    for row in grid {
+        for cell in row {
+            print!("{cell}");
+        }
+        print!("\n");
+    }
+}
+
+fn find_tiles_on_path(grid: &Vec<Vec<char>>) -> usize {
+    grid.iter()
+        .map(|row| row.iter().filter(|cell| **cell == 'O').count())
+        .sum()
 }
 
 fn main() {
     let mut content = String::new();
-    File::open("test1")
+    File::open("input")
         .unwrap()
         .read_to_string(&mut content)
         .unwrap();
 
-    let (grid, start, end) = parse(&content);
-    let min_distance = dijkstra(&grid, &start, &end);
+    let (mut grid, start, end) = parse(&content);
+    let (min_distances, paths) = dijkstra(&grid, &start);
+    let min_distance = *min_distances[end.row][end.col].iter().min().unwrap();
     println!("{}", min_distance);
+    for (direction, _) in min_distances[end.row][end.col]
+        .iter()
+        .enumerate()
+        .filter(|(_, dir)| **dir == min_distance)
+    {
+        mark_paths(&mut grid, &paths, &min_distances, &end, direction, &start);
+    }
+    print_grid(&grid);
+    println!("{}", find_tiles_on_path(&grid));
 }
