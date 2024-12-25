@@ -1,0 +1,6 @@
+[package]
+name = "a2024-25-code-chronicle"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
