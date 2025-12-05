@@ -1,0 +1,6 @@
+[package]
+name = "a2025-04-printing-department"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
